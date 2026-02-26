@@ -109,12 +109,10 @@ This step takes approximately 10 to 20 minutes depending on your hardware.
 
 ### Step 6 — Start the server
 
-Double-click `START-SERVER.bat` or run:
-
-```
-START-SERVER.bat
-```
-
+2. Double-click `START-SERVER.bat`.
+   - On the very first run, it will automatically install `node_modules` (offline if cached, internet if not).
+   - **Important:** On the first run, the script will also download a 70MB font archive (for city names and labels) and extract the required offline fonts. This needs internet. You only do this *once*.
+3. The console will say: `S4 OFFLINE MAP SERVER — RUNNING`
 The server will print your local and network IP addresses:
 
 ```
