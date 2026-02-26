@@ -28,7 +28,7 @@
     <div id="map"></div>
     <script>
         const TILES = `${location.protocol}//${location.host}/tiles/{z}/{x}/{y}`;
-        const GLYPHS = `${location.protocol}//${location.host}/fonts/{fontstack}/{range}`;
+        const GLYPHS = `${location.protocol}//${location.host}/fonts/{fontstack}/{range}.pbf`;
 
         const map = new maplibregl.Map({
             container: 'map',
@@ -44,21 +44,67 @@
                     }
                 },
                 layers: [
-                    { id: 'bg', type: 'background', paint: { 'background-color': '#d8e8c8' } },
+                    // Background
+                    { id: 'background', type: 'background', paint: { 'background-color': '#d8e8c8' } },
+
+                    // Water
                     { id: 'water', type: 'fill', source: 'pk', 'source-layer': 'water', paint: { 'fill-color': '#7ec8e3' } },
-                    { id: 'waterway', type: 'line', source: 'pk', 'source-layer': 'waterway', paint: { 'line-color': '#7ec8e3', 'line-width': 1 } },
+                    { id: 'waterway', type: 'line', source: 'pk', 'source-layer': 'waterway', paint: { 'line-color': '#74b3d8', 'line-width': 1 } },
+
+                    // Land cover
                     { id: 'landcover', type: 'fill', source: 'pk', 'source-layer': 'landcover', paint: { 'fill-color': '#b8d8a0', 'fill-opacity': 0.7 } },
-                    { id: 'landuse', type: 'fill', source: 'pk', 'source-layer': 'landuse', paint: { 'fill-color': '#e8e0d8', 'fill-opacity': 0.7 } },
+                    { id: 'landuse', type: 'fill', source: 'pk', 'source-layer': 'landuse', paint: { 'fill-color': '#e8e0d8', 'fill-opacity': 0.6 } },
                     { id: 'park', type: 'fill', source: 'pk', 'source-layer': 'park', paint: { 'fill-color': '#c8e8b0', 'fill-opacity': 0.7 } },
-                    { id: 'boundary', type: 'line', source: 'pk', 'source-layer': 'boundary', paint: { 'line-color': '#999', 'line-width': 1 } },
-                    { id: 'bldg', type: 'fill', source: 'pk', 'source-layer': 'building', minzoom: 13, paint: { 'fill-color': '#d0c8c0', 'fill-outline-color': '#b0a8a0' } },
-                    { id: 'road-all', type: 'line', source: 'pk', 'source-layer': 'transportation', paint: { 'line-color': '#fff', 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 0.3, 10, 1, 14, 4] } },
+
+                    // Boundaries
                     {
-                        id: 'road-main', type: 'line', source: 'pk', 'source-layer': 'transportation', filter: ['in', 'class', 'primary', 'motorway', 'trunk'],
-                        paint: { 'line-color': '#f8a060', 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 0.8, 10, 2, 14, 7] }
+                        id: 'boundary-country', type: 'line', source: 'pk', 'source-layer': 'boundary', filter: ['==', 'admin_level', 2],
+                        paint: { 'line-color': '#888', 'line-width': 1.5, 'line-dasharray': [4, 2] }
+                    },
+                    {
+                        id: 'boundary-province', type: 'line', source: 'pk', 'source-layer': 'boundary', filter: ['==', 'admin_level', 4],
+                        minzoom: 5, paint: { 'line-color': '#aaa', 'line-width': 0.8, 'line-dasharray': [3, 3] }
                     },
 
-                    // ── Place labels ────────────────────────────────────────────
+                    // Buildings
+                    {
+                        id: 'building', type: 'fill', source: 'pk', 'source-layer': 'building',
+                        minzoom: 13, paint: { 'fill-color': '#d0c8c0', 'fill-outline-color': '#b0a8a0' }
+                    },
+
+                    // Roads — minor
+                    {
+                        id: 'road-minor', type: 'line', source: 'pk', 'source-layer': 'transportation',
+                        filter: ['in', 'class', 'minor', 'path', 'track', 'service'],
+                        minzoom: 11,
+                        paint: { 'line-color': '#ffffff', 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 0.5, 16, 3] }
+                    },
+
+                    // Roads — secondary/tertiary
+                    {
+                        id: 'road-secondary', type: 'line', source: 'pk', 'source-layer': 'transportation',
+                        filter: ['in', 'class', 'secondary', 'tertiary'],
+                        paint: {
+                            'line-color': '#fdf8c0', 'line-width': ['interpolate', ['linear'], ['zoom'], 7, 0.5, 14, 3, 18, 8],
+                            'line-opacity': ['interpolate', ['linear'], ['zoom'], 7, 0, 8, 1]
+                        }
+                    },
+
+                    // Roads — primary
+                    {
+                        id: 'road-primary', type: 'line', source: 'pk', 'source-layer': 'transportation',
+                        filter: ['==', 'class', 'primary'],
+                        paint: { 'line-color': '#fcd87e', 'line-width': ['interpolate', ['linear'], ['zoom'], 6, 0.5, 14, 4, 18, 10] }
+                    },
+
+                    // Roads — motorway / trunk
+                    {
+                        id: 'road-motorway', type: 'line', source: 'pk', 'source-layer': 'transportation',
+                        filter: ['in', 'class', 'motorway', 'trunk'],
+                        paint: { 'line-color': '#f8a060', 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 0.8, 10, 2.5, 14, 7] }
+                    },
+
+                    // City labels
                     {
                         id: 'label-city', type: 'symbol', source: 'pk', 'source-layer': 'place',
                         filter: ['in', 'class', 'city', 'capital'],
@@ -66,25 +112,27 @@
                         layout: {
                             'text-field': ['coalesce', ['get', 'name:en'], ['get', 'name']],
                             'text-font': ['Open Sans Bold'],
-                            'text-size': ['interpolate', ['linear'], ['zoom'], 4, 11, 8, 14, 12, 18],
-                            'text-anchor': 'center',
-                            'text-max-width': 8
+                            'text-size': ['interpolate', ['linear'], ['zoom'], 4, 11, 8, 15, 12, 18],
+                            'text-anchor': 'center', 'text-max-width': 8, 'text-offset': [0, 0.2]
                         },
                         paint: { 'text-color': '#1a1a2e', 'text-halo-color': '#ffffff', 'text-halo-width': 2 }
                     },
+
+                    // Town / village labels
                     {
                         id: 'label-town', type: 'symbol', source: 'pk', 'source-layer': 'place',
-                        filter: ['in', 'class', 'town', 'village'],
+                        filter: ['in', 'class', 'town', 'village', 'suburb'],
                         minzoom: 7,
                         layout: {
                             'text-field': ['coalesce', ['get', 'name:en'], ['get', 'name']],
                             'text-font': ['Open Sans Regular'],
                             'text-size': ['interpolate', ['linear'], ['zoom'], 7, 9, 12, 13],
-                            'text-anchor': 'center',
-                            'text-max-width': 7
+                            'text-anchor': 'center', 'text-max-width': 7
                         },
                         paint: { 'text-color': '#333', 'text-halo-color': '#fff', 'text-halo-width': 1.5 }
                     },
+
+                    // Road name labels
                     {
                         id: 'label-road', type: 'symbol', source: 'pk', 'source-layer': 'transportation_name',
                         filter: ['in', 'class', 'primary', 'motorway', 'trunk', 'secondary'],
@@ -92,30 +140,29 @@
                         layout: {
                             'text-field': ['coalesce', ['get', 'name:en'], ['get', 'name']],
                             'text-font': ['Open Sans Regular'],
-                            'text-size': 11,
-                            'symbol-placement': 'line',
-                            'text-max-angle': 30
+                            'text-size': 11, 'symbol-placement': 'line', 'text-max-angle': 30
                         },
                         paint: { 'text-color': '#555', 'text-halo-color': '#fff', 'text-halo-width': 1.5 }
                     },
                 ]
             },
             center: [69.3451, 30.3753],
-            zoom: 5
+            zoom: 5,
+            minZoom: 3,
+            maxZoom: 18,
         });
 
         map.addControl(new maplibregl.NavigationControl(), 'top-right');
         map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-left');
 
+        // Click to show coordinates
         map.on('click', e => {
             const { lat, lng } = e.lngLat;
             new maplibregl.Popup()
                 .setLngLat([lng, lat])
-                .setHTML(`Lat: ${lat.toFixed(6)}<br>Lng: ${lng.toFixed(6)}`)
+                .setHTML(`<strong>Lat:</strong> ${lat.toFixed(6)}<br><strong>Lng:</strong> ${lng.toFixed(6)}`)
                 .addTo(map);
         });
-
-        map.on('error', e => console.error('MapLibre error:', e.error));
     </script>
 </body>
 
