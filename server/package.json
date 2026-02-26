@@ -1,0 +1,14 @@
+{
+  "name": "s4-offline-map-server",
+  "version": "1.0.0",
+  "description": "S4 Offline Map Server — serves tiles + frontend on one port",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "better-sqlite3": "^9.4.3",
+    "cors": "^2.8.5"
+  }
+}

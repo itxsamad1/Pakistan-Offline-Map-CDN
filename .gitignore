@@ -1,0 +1,20 @@
+# Large generated files — do not commit
+*.mbtiles
+*.osm.pbf
+*.jar
+*.log
+
+# Planetiler working directories
+data/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# MapLibre local copies (user downloads these separately)
+server/public/libs/maplibre-gl.js
+server/public/libs/maplibre-gl.css
+
+# OS
+.DS_Store
+Thumbs.db

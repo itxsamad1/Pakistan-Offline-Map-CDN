@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>S4 — Offline Map</title>
+    <link rel="stylesheet" href="/libs/maplibre-gl.css" />
+    <script src="/libs/maplibre-gl.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html,
+        body,
+        #map {
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="map"></div>
+    <script>
+        const TILES = `${location.protocol}//${location.host}/tiles/{z}/{x}/{y}`;
+
+        const map = new maplibregl.Map({
+            container: 'map',
+            style: {
+                version: 8,
+                sources: {
+                    pk: {
+                        type: 'vector',
+                        tiles: [TILES],
+                        minzoom: 0,
+                        maxzoom: 14
+                    }
+                },
+                layers: [
+                    { id: 'bg', type: 'background', paint: { 'background-color': '#d8e8c8' } },
+                    { id: 'water', type: 'fill', source: 'pk', 'source-layer': 'water', paint: { 'fill-color': '#7ec8e3' } },
+                    { id: 'waterway', type: 'line', source: 'pk', 'source-layer': 'waterway', paint: { 'line-color': '#7ec8e3', 'line-width': 1 } },
+                    { id: 'landcover', type: 'fill', source: 'pk', 'source-layer': 'landcover', paint: { 'fill-color': '#b8d8a0', 'fill-opacity': 0.7 } },
+                    { id: 'landuse', type: 'fill', source: 'pk', 'source-layer': 'landuse', paint: { 'fill-color': '#e8e0d8', 'fill-opacity': 0.7 } },
+                    { id: 'park', type: 'fill', source: 'pk', 'source-layer': 'park', paint: { 'fill-color': '#c8e8b0', 'fill-opacity': 0.7 } },
+                    { id: 'boundary', type: 'line', source: 'pk', 'source-layer': 'boundary', paint: { 'line-color': '#999', 'line-width': 1 } },
+                    { id: 'bldg', type: 'fill', source: 'pk', 'source-layer': 'building', minzoom: 13, paint: { 'fill-color': '#d0c8c0', 'fill-outline-color': '#b0a8a0' } },
+                    { id: 'road-all', type: 'line', source: 'pk', 'source-layer': 'transportation', paint: { 'line-color': '#fff', 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 0.3, 10, 1, 14, 4] } },
+                    {
+                        id: 'road-main', type: 'line', source: 'pk', 'source-layer': 'transportation', filter: ['in', 'class', 'primary', 'motorway', 'trunk'],
+                        paint: { 'line-color': '#f8a060', 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 0.8, 10, 2, 14, 7] }
+                    },
+                ]
+            },
+            center: [69.3451, 30.3753],
+            zoom: 5
+        });
+
+        map.addControl(new maplibregl.NavigationControl(), 'top-right');
+        map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-left');
+
+        map.on('click', e => {
+            const { lat, lng } = e.lngLat;
+            new maplibregl.Popup()
+                .setLngLat([lng, lat])
+                .setHTML(`Lat: ${lat.toFixed(6)}<br>Lng: ${lng.toFixed(6)}`)
+                .addTo(map);
+        });
+
+        map.on('error', e => console.error('MapLibre error:', e.error));
+    </script>
+</body>
+
+</html>
