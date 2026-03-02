@@ -10,6 +10,7 @@ const fs = require("fs");
 const https = require("https");
 const http = require("http");
 
+
 const app = express();
 const PORT = 3000;
 
@@ -49,6 +50,16 @@ if (mbtilesFile) db = openDB(mbtilesFile);
 // ─── CORS ─────────────────────────────────────────────────────────────────────
 app.use((req, res, next) => {
     res.header("Access-Control-Allow-Origin", "*");
+    next();
+});
+
+// ─── Request logger ───────────────────────────────────────────────────────────
+app.use((req, res, next) => {
+    const start = Date.now();
+    res.on("finish", () => {
+        const ms = Date.now() - start;
+        console.log(`${res.statusCode} ${req.method} ${req.url} (${ms}ms)`);
+    });
     next();
 });
 
@@ -132,49 +143,70 @@ app.get("/tiles.json", (req, res) => {
     });
 });
 
+// ─── Offline Routing API ─────────────────────────────────────────────────────
+// Proxies to GraphHopper running on port 8989.
+// Start GraphHopper with START-ROUTING.bat before using this endpoint.
+// Usage: GET /route?waypoints=lng1,lat1;lng2,lat2;lng3,lat3
+app.post("/route", express.json(), async (req, res) => {
+    const { waypoints } = req.body;
+    if (!waypoints) return res.status(400).json({ error: "waypoints required" });
+
+    const points = waypoints.split(";").map((w) => {
+        const [lng, lat] = w.split(",").map(Number);
+        return [lng, lat]; // GH POST JSON uses [lng, lat]
+    });
+
+    try {
+        const ghRes = await fetch("http://localhost:8989/route", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                points,
+                profile: "car",
+                locale: "en",
+                points_encoded: false
+            }),
+            signal: AbortSignal.timeout(15000)
+        });
+        if (!ghRes.ok) {
+            const body = await ghRes.text().catch(() => "");
+            throw new Error(`GraphHopper ${ghRes.status}: ${body.slice(0, 120)}`);
+        }
+        const data = await ghRes.json();
+        if (!data.paths || !data.paths[0]) throw new Error("No route returned");
+
+        // GeoJSON coordinates come as [lng, lat] which is what MapLibre needs
+        res.json({ routing: true, coordinates: data.paths[0].points.coordinates });
+    } catch (err) {
+        console.warn("Routing proxy error:", err.message);
+        res.status(503).json({
+            routing: false,
+            error: err.message.startsWith("GraphHopper") ? err.message : "GraphHopper not running — start START-ROUTING.bat"
+        });
+    }
+});
+
 // ─── Status API ───────────────────────────────────────────────────────────────
 app.get("/api/status", (req, res) => {
     res.json({
         status: db ? "ready" : "no_tiles",
         mbtiles: mbtilesFile ? path.basename(mbtilesFile) : null,
+        routing: osrmRouter !== null,
         message: db ? "Map server is running" : "Run generate-tiles.bat to generate tiles first",
     });
 });
 
-// ─── Font caching proxy (download once, serve offline forever) ───────────────
-const FONTS_DIR = path.join(__dirname, "fonts");
-if (!fs.existsSync(FONTS_DIR)) fs.mkdirSync(FONTS_DIR, { recursive: true });
-
+// ─── Fonts — served from pre-downloaded files in server/fonts/ ───────────────
+// Fonts are downloaded by START-SERVER.bat before the server starts.
+// Route: /fonts/:fontstack/:range  e.g. /fonts/Open Sans Bold/0-255.pbf
 app.get("/fonts/:fontstack/:range", (req, res) => {
-    const { fontstack, range } = req.params;
-    const fontDir = path.join(FONTS_DIR, fontstack);
-    const fontFile = path.join(fontDir, range);
-
+    const fontFile = path.join(__dirname, "fonts", req.params.fontstack, req.params.range);
+    if (!fs.existsSync(fontFile)) {
+        return res.status(404).send("Font not found. Run START-SERVER.bat to download fonts.");
+    }
     res.setHeader("Content-Type", "application/x-protobuf");
     res.setHeader("Access-Control-Allow-Origin", "*");
-
-    // Serve from cache if already downloaded
-    if (fs.existsSync(fontFile)) {
-        return res.sendFile(fontFile);
-    }
-
-    // Download and cache
-    const url = `https://demotiles.maplibre.org/font/${encodeURIComponent(fontstack)}/${range}`;
-    const get = url.startsWith("https") ? https.get : http.get;
-
-    get(url, (remote) => {
-        if (remote.statusCode !== 200) {
-            return res.status(404).send("Font not found");
-        }
-        fs.mkdirSync(fontDir, { recursive: true });
-        const chunks = [];
-        remote.on("data", (c) => chunks.push(c));
-        remote.on("end", () => {
-            const buf = Buffer.concat(chunks);
-            fs.writeFileSync(fontFile, buf);
-            res.send(buf);
-        });
-    }).on("error", () => res.status(502).send("Could not fetch font"));
+    res.sendFile(fontFile);
 });
 
 // ─── Static frontend ─────────────────────────────────────────────────────────

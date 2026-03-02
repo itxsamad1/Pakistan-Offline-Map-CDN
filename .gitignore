@@ -3,6 +3,10 @@
 *.osm.pbf
 *.jar
 *.log
+*.zip
+
+# GraphHopper cached routing graph (generated on first run)
+pakistan-ghrouting/
 
 # Planetiler working directories
 data/
